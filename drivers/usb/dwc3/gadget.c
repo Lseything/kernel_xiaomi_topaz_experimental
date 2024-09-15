@@ -1700,6 +1700,7 @@ static int __dwc3_gadget_get_frame(struct dwc3 *dwc)
  */
 static int __dwc3_stop_active_transfer(struct dwc3_ep *dep, bool force, bool interrupt)
 {
+	struct dwc3 *dwc = dep->dwc;
 	struct dwc3_gadget_ep_cmd_params params;
 	u32 cmd;
 	int ret;
@@ -1724,7 +1725,8 @@ static int __dwc3_stop_active_transfer(struct dwc3_ep *dep, bool force, bool int
 	dep->resource_index = 0;
 
 	if (!interrupt) {
-		mdelay(1);
+		if (!DWC3_IP_IS(DWC3) || DWC3_VER_IS_PRIOR(DWC3, 310A))
+			mdelay(1);
 		dep->flags &= ~DWC3_EP_TRANSFER_STARTED;
 	} else if (!ret) {
 		dep->flags |= DWC3_EP_END_TRANSFER_PENDING;
@@ -2588,15 +2590,6 @@ static int dwc3_gadget_soft_disconnect(struct dwc3 *dwc)
 
 static int dwc3_gadget_soft_connect(struct dwc3 *dwc)
 {
-	/*
-	 * In the Synopsys DWC_usb31 1.90a programming guide section
-	 * 4.1.9, it specifies that for a reconnect after a
-	 * device-initiated disconnect requires a core soft reset
-	 * (DCTL.CSftRst) before enabling the run/stop bit.
-	 */
-	dwc3_core_soft_reset(dwc);
-
-	dwc3_event_buffers_setup(dwc);
 	__dwc3_gadget_start(dwc);
 	return dwc3_gadget_run_stop(dwc, true);
 }
@@ -3825,13 +3818,6 @@ static void dwc3_gadget_disconnect_interrupt(struct dwc3 *dwc)
 	usb_gadget_set_state(dwc->gadget, USB_STATE_NOTATTACHED);
 
 	dwc3_ep0_reset_state(dwc);
-
-	/*
-	 * Request PM idle to address condition where usage count is
-	 * already decremented to zero, but waiting for the disconnect
-	 * interrupt to set dwc->connected to FALSE.
-	 */
-	pm_request_idle(dwc->dev);
 }
 
 static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
