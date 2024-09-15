@@ -43,7 +43,7 @@ static void __init init_irq_default_affinity(void)
 	if (!cpumask_available(irq_default_affinity))
 		zalloc_cpumask_var(&irq_default_affinity, GFP_NOWAIT);
 	if (cpumask_empty(irq_default_affinity))
-		cpumask_setall(irq_default_affinity);
+		cpumask_set_cpu(0, irq_default_affinity);
 }
 #else
 static void __init init_irq_default_affinity(void)
@@ -697,10 +697,8 @@ int handle_domain_irq(struct irq_domain *domain,
 	int ret = 0;
 
 
-	__irq_enter_raw();
 	/* The irqdomain code provides boundary checks */
 	desc = irq_resolve_mapping(domain, hwirq);
-	__irq_exit_raw();
 	if (likely(desc)) {
 		if (IS_ENABLED(CONFIG_ARCH_WANTS_IRQ_RAW) &&
 		    unlikely(irq_settings_is_raw(desc))) {
